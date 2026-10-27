@@ -1,8 +1,8 @@
 # Satellite-based Deforestation and Land Cover classification
 ## How to install
-1. Agree to the rules of [this Kaggle competition](https://www.kaggle.com/competitions/planet-understanding-the-amazon-from-space/data)
-2. Make sure you have a Kaggle API key and set in either in `.env` or `~/.kaggle`. Kaggle should prompt you to do this upon key creation
-3. Install uv and make sure it's in your `PATH`
+1. Make sure you have a Kaggle API key and set in either in `.env` or `~/.kaggle`. Kaggle should prompt you to do this upon key creation
+2. Install uv and make sure it's in your `PATH`
+3. Run `uv python install 3.13`
 4. run `uv sync` to sync your virtual environment
 
 ## Development tips
