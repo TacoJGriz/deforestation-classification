@@ -1,6 +1,15 @@
 from pathlib import Path
 from kaggle.api.kaggle_api_extended import KaggleApi
 
+import tensorflow
+from tensorflow import keras
+from tensorflow.keras import layers, models
+from tensorflow.keras.applications import ResNet50
+
+import pandas as pd
+from sklearn.preprocessing import MultiLabelBinarizer
+from sklearn.model_selection import train_test_split
+
 dataset = "nikitarom/planets-dataset"
 dataset_dir = Path("data/planets-dataset")
 
@@ -24,13 +33,33 @@ def download_dataset():
             )
         except Exception as exc:
             raise RuntimeError(
-                "Kaggle authentication or competition access failed. "
-                "Check your API token and make sure you accepted the competition rules."
+                "Kaggle authentication failed. "
+                "Check your API token"
             ) from exc
 
+def find_paths():
+    classes_dir = next(dataset_dir.rglob("train_classes.csv"))
+    train_dir = next(p for p in dataset_dir.rglob("train-jpg") if p.is_dir())
+    test_dir = next(p for p in dataset_dir.rglob("test-jpg") if p.is_dir())
+    return classes_dir, train_dir, test_dir
+
+def load_data():
+    classes_dir, train_dir, _ = find_paths()
+    df = pd.read_csv(classes_dir)
+    df["tags"] = df["tags"].str.split()
+    mlb = MultiLabelBinarizer()
+    y = mlb.fit_transform(df["tags"]).astype("float32")
+    paths = (train_dir / (df["image_name"] + ".jpg")).astype(str)
+
+    train_p, val_p, train_y, val_y = train_test_split(
+        paths, y, test_size=0.2
+    )
+
+    return train_p, val_p, train_y, val_y
 
 def main():
     download_dataset()
+    train_p, val_p, train_y, val_y = load_data()
 
 if __name__ == "__main__":
     main()
