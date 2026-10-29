@@ -9,6 +9,8 @@ from tensorflow.keras.applications import ResNet50
 import pandas as pd
 from sklearn.preprocessing import MultiLabelBinarizer
 from sklearn.model_selection import train_test_split
+from tensorflow.keras.applications.resnet50 import preprocess_input
+
 
 dataset = "nikitarom/planets-dataset"
 dataset_dir = Path("data/planets-dataset")
