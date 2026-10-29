@@ -9,3 +9,4 @@
 1. Use `uv run main.py` to run the script
 2. If you need to install a package that has not yet been added, use `uv add [package]`. Projects with uv do not require pip
 3. If somebody else adds a package, run `uv sync` to make sure your virtual environment is up to date
+4. If you want to work in Jupyter, use `uv run jupyter lab`
