@@ -59,9 +59,114 @@ def load_data():
 
     return train_p, val_p, train_y, val_y
 
+IMG_SIZE = 224
+AUTOTUNE = tf.data.AUTOTUNE
+
+def _pil_load(path):
+    path = path.decode() if isinstance(path, bytes) else str(path)
+    img = Image.open(path).convert("RGB").resize((IMG_SIZE, IMG_SIZE), Image.BILINEAR)
+    return np.asarray(img, dtype=np.float32)
+
+def load(path, label):
+    img = tf.numpy_function(_pil_load, [path], tf.float32)
+    img.set_shape((IMG_SIZE, IMG_SIZE, 3))
+    return img, label
+
+def augment(img, label):
+    img = tf.image.random_flip_left_right(img)
+    img = tf.image.random_flip_up_down(img)
+    img = tf.image.rot90(img, k=tf.random.uniform([], 0, 4, tf.int32))
+    return img, label
+
+def prep(img, label):
+    return preprocess_input(img), label
+
+def show_preview(ds, class_names, n=8, cols=4):
+    rows = int(np.ceil(n / cols))
+    plt.figure(figsize=(4 * cols, 4 * rows))
+    for i, (img, label) in enumerate(ds.take(n)):
+        tags = [class_names[j] for j in np.where(label.numpy() == 1)[0]]
+        plt.subplot(rows, cols, i + 1)
+        plt.imshow(img.numpy().astype("uint8"))
+        plt.title("\n".join(tags), fontsize=9)
+        plt.axis("off")
+    plt.tight_layout()
+    plt.show()
+
+def make_ds(paths, labels, training, preview=False, batch=64):
+    ds = tf.data.Dataset.from_tensor_slices((paths, labels))
+    if training:
+        ds = ds.shuffle(len(paths))
+    ds = ds.map(load, num_parallel_calls=AUTOTUNE)
+    if preview:
+        show_preview(ds, class_names)
+    if training:
+        ds = ds.map(augment, num_parallel_calls=AUTOTUNE)
+    return ds.map(prep, num_parallel_calls=AUTOTUNE).batch(batch).prefetch(AUTOTUNE)
+
+def create_model():
+    base = ResNet50(
+        weights="imagenet", 
+        include_top=False,
+        input_shape=(IMG_SIZE, IMG_SIZE, 3)
+    )
+    
+    base.trainable = False
+
+    model = models.Sequential([
+        base,
+        layers.GlobalAveragePooling2D(),
+        layers.Dense(256, activation="relu"),
+        layers.Dropout(0.3),
+        layers.Dense(len(class_names), activation="sigmoid"),
+    ])
+    
+    model.compile(
+        optimizer=keras.optimizers.Adam(1e-3),
+        loss="binary_crossentropy",
+        metrics=[keras.metrics.BinaryAccuracy(),
+                 keras.metrics.Precision(), keras.metrics.Recall()],
+    )
+    return model
+
+def train(model):
+    history = model.fit(
+        train_ds,
+        validation_data=val_ds,
+        epochs=15,
+        batch_size=64
+    )
+    
+    return history
+
+def plot(history, export=False):
+    fig, ax = plt.subplots(1, 2, figsize=(12, 4))
+    ax[0].plot(history.history["loss"], label="train")
+    ax[0].plot(history.history["val_loss"], label="val")
+    ax[0].set_title("Loss"); ax[0].legend()
+    ax[1].plot(history.history["recall"], label="train recall")
+    ax[1].plot(history.history["val_recall"], label="val recall")
+    ax[1].set_title("Recall"); ax[1].legend()
+    if export:
+        plt.tight_layout()
+        OUT_DIR = Path("outputs")
+        OUT_DIR.mkdir(exist_ok=True)
+        path = (OUT_DIR / "training_curves.png").resolve()
+        plt.savefig(path, dpi=150)
+        print("Saved file to ", path)
+        plt.close(fig)
+    else:
+        plt.show()
+
+
 def main():
     download_dataset()
     train_p, val_p, train_y, val_y = load_data()
+    train_ds = make_ds(train_p, train_y, training=True, preview=True)
+    val_ds   = make_ds(val_p, val_y, training=False)
+    model = create_model()
+    history = train(model)
+    plot(history)
 
 if __name__ == "__main__":
     main()
